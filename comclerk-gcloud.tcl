@@ -9,9 +9,38 @@ snit::type ComDict {
     variable myPrefixList
     
     method accept args {
-        puts $args
+        # puts [list gcloud {*}$args]
+        set globalOpts [$self take-global-options args]
+        puts [list globalOpts $globalOpts args $args]
+        foreach prefix $myPrefixList {
+            if {[lrange $args 0 [expr {[llength $prefix]-1}]] eq $prefix} {
+                puts "Hit: $prefix"
+                break
+            }
+        }
     }
     
+    method take-global-options varName {
+        upvar 1 $varName argVar
+        set tobeRemoved []
+        set pos 0
+        foreach arg $argVar {
+            if {[regexp {^--(\w+)=(.*)} $arg -> name value]} {
+                if {[dict exists $myGlobalOptions $name]} {
+                    lappend tobeRemoved $pos
+                }
+            }
+            incr pos
+        }
+        
+        set removedOpts []
+        foreach pos [lreverse $tobeRemoved] {
+            lappend removedOpts [lindex $argVar $pos]
+            set argVar [lreplace $argVar $pos $pos]
+        }
+        set removedOpts
+    }
+
     method {global-options add} option {
         # XXX: 重複検査
         dict set myGlobalOptions $option [dict create]
@@ -41,8 +70,8 @@ snit::type comclerk-gcloud {
         install myComDict using ComDict $self.comdict
         
         $myComDict global-options add project
-        $myComDict global-options add zone
         $myComDict global-options add region
+        # $myComDict global-options add zone
         
         $myComDict 1arg-prefix add {beta compute instances create}
         $myComDict 1arg-prefix add {compute instance-groups unmanaged create}
