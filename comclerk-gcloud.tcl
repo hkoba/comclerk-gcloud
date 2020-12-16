@@ -35,36 +35,59 @@ snit::type comclerk-gcloud {
     typeconstructor {
         set ourKnownCmd [ComDict $type.comdict]
         
+        $ourKnownCmd translator add create [list apply {{matched global name args} {
+            dict merge \
+                $global \
+                [dict create name $name options $args] \
+                $matched
+        }}]
+
         $ourKnownCmd global-options add project
-        $ourKnownCmd global-options add region
+        # $ourKnownCmd global-options add region
         # $ourKnownCmd global-options add zone
         
-        $ourKnownCmd 1arg-prefix add {beta compute instances create}
-        $ourKnownCmd 1arg-prefix add {compute instance-groups unmanaged create}
-        $ourKnownCmd 1arg-prefix add {compute instance-groups set-named-ports}
-        $ourKnownCmd 1arg-prefix add {compute instance-groups unmanaged add-instances}
+        $ourKnownCmd 1arg-prefix add vm \
+            create {beta compute instances create}
         
-        $ourKnownCmd 1arg-prefix add {compute addresses create}
-        $ourKnownCmd 1arg-prefix add {compute health-checks create tcp}
+        $ourKnownCmd 1arg-prefix add ig/unmanaged \
+            create {compute instance-groups unmanaged create}
+        $ourKnownCmd 1arg-prefix add {ig named-port} \
+            {set named-port} {compute instance-groups set-named-ports}
+        $ourKnownCmd 1arg-prefix add {ig vm} \
+            {add vm} {compute instance-groups unmanaged add-instances}
         
-        $ourKnownCmd 1arg-prefix add {compute backend-services create}
-        $ourKnownCmd 1arg-prefix add {compute backend-services add-backend}
+        $ourKnownCmd 1arg-prefix add address \
+            create {compute addresses create}
+        $ourKnownCmd 1arg-prefix add health-check \
+            create {compute health-checks create tcp}
         
-        $ourKnownCmd 1arg-prefix add {compute url-maps create}
+        $ourKnownCmd 1arg-prefix add {lb backend-service} \
+            create {compute backend-services create}
+        $ourKnownCmd 1arg-prefix add {lb backend-service backend} \
+            {add ig} {compute backend-services add-backend}
         
-        $ourKnownCmd 1arg-prefix add {compute ssl-certificates create}
-        $ourKnownCmd 1arg-prefix add {compute target-https-proxies create}
+        $ourKnownCmd 1arg-prefix add {lb url-map} \
+            create {compute url-maps create}
+        
+        $ourKnownCmd 1arg-prefix add ssl-certificate \
+            create {compute ssl-certificates create}
+        $ourKnownCmd 1arg-prefix add {lb target-https-proxie} \
+            create {compute target-https-proxies create}
 
-        $ourKnownCmd 1arg-prefix add {compute firewall-rules create}
+        $ourKnownCmd 1arg-prefix add firewall-rule \
+            create {compute firewall-rules create}
         
-        $ourKnownCmd 1arg-prefix add {dns record-sets transaction start}
-        $ourKnownCmd 1arg-prefix add {dns record-sets transaction add}
-        $ourKnownCmd 1arg-prefix add {dns record-sets transaction execute}
+        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction start}
+        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction add}
+        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction execute}
         
-        $ourKnownCmd 1arg-prefix add {alpha iap oauth-brands create}
-        $ourKnownCmd 1arg-prefix add {alpha iap oauth-clients create}
+        $ourKnownCmd 1arg-prefix add {iap oauth-brand} \
+            create {alpha iap oauth-brands create}
+        $ourKnownCmd 1arg-prefix add {iap oauth-client} \
+            create {alpha iap oauth-clients create}
         
-        $ourKnownCmd 1arg-prefix add {compute backend-services update}
+        $ourKnownCmd 1arg-prefix add {backend-service *} \
+            update {compute backend-services update}
     }
 }
 
