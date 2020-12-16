@@ -98,4 +98,22 @@ snit::type ComDict {
             }
         }
     }
+
+    method {scope-prefix add} {resource begin beginPrefix end endPrefix} {
+        foreach {kind prefix} [list begin $beginPrefix end $endPrefix] {
+            if {[dict exists $myPrefixDict $prefix]} {
+                error "Command definition confliction: gcloud $prefix"
+            }
+            dict set myPrefixDict $prefix \
+                [dict create \
+                     kind scope-prefix \
+                     resource $resource \
+                     trigger_verb $kind \
+                     verbs [dict create $kind $prefix]]
+        }
+    }
+
+    method {scope-prefix get-name} {argListVar specDict} {
+        ;# nop
+    }
 }

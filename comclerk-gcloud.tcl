@@ -73,9 +73,11 @@ snit::type comclerk-gcloud {
         $ourKnownCmd 1arg-prefix add firewall-rule \
             create {compute firewall-rules create}
         
-        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction start}
-        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction add}
-        # $ourKnownCmd 1arg-prefix add {dns record-sets transaction execute}
+        $ourKnownCmd scope-prefix add {dns record-set} \
+            begin {dns record-sets transaction start} \
+            end {dns record-sets transaction execute}
+        $ourKnownCmd 1arg-prefix add {dns record-set} \
+            add {dns record-sets transaction add}
         
         $ourKnownCmd named-arg-prefix add {iap oauth-brand} \
             create application_title {alpha iap oauth-brands create}
