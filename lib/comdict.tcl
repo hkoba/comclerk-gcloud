@@ -6,9 +6,7 @@ package require snit
 snit::type ComDict {
     variable myGlobalOptions
     
-    variable myPrefixDict
-    
-    variable myTranslatorDict [dict create]
+    variable myPrefixDict [dict create]
     
     method accept args {
         # puts [list gcloud {*}$args]
@@ -16,22 +14,13 @@ snit::type ComDict {
         if {[set prefix [$self match-prefix $args]] eq ""} {
             return [list unknown $args]
         }
-        $self translate-by $prefix $globalOpts \
-            [lrange $args [llength $prefix] end]
-    }
-    
-    method {translator add} {verb command} {
-        dict set myTranslatorDict $verb $command
-    }
-
-    method translate-by {prefix global argList} {
         set matched [dict get $myPrefixDict $prefix]
-        set verb [dict get $matched trigger-verb]
-        if {[dict exists $myTranslatorDict $verb]} {
-            {*}[dict get $myTranslatorDict $verb] \
-                [dict remove $matched trigger-verb] $global {*}$argList
-        } else {
-            list matched $matched global $global args $argList
+        set rest [lrange $args [llength $prefix] end]
+        dict with matched {
+            set name [$self $kind get-name rest $matched]
+            dict create verb $trigger_verb resource $resource \
+                name $name options $rest \
+                {*}$globalOpts
         }
     }
 
@@ -69,13 +58,44 @@ snit::type ComDict {
         # XXX: 重複検査
         dict set myGlobalOptions $option [dict create]
     }
-    
+
     method {1arg-prefix add} {resource action prefix args} {
-        # XXX: 重複検査
+        if {[dict exists $myPrefixDict $prefix]} {
+            error "Command definition confliction: gcloud $prefix"
+        }
         dict set myPrefixDict $prefix \
             [dict create \
+                 kind 1arg-prefix \
                  resource $resource \
-                 trigger-verb $action \
-                 $action $prefix {*}$args]
+                 trigger_verb $action \
+                 verbs [dict create $action $prefix {*}$args]]
+    }
+
+    method {1arg-prefix get-name} {argListVar specDict} {
+        upvar 1 $argListVar argList
+        set argList [lassign $argList name]
+        set name
+    }
+
+    method {named-arg-prefix add} {resource action nameArg prefix args} {
+        dict set myPrefixDict $prefix \
+            [dict create \
+                 kind named-arg-prefix \
+                 resource $resource \
+                 trigger_verb $action \
+                 nameArg $nameArg \
+                 verbs [dict create $action $prefix {*}$args]]
+    }
+    
+    method {named-arg-prefix get-name} {argListVar specDict} {
+        upvar 1 $argListVar argList
+        set nameArg [dict get $specDict nameArg]
+        foreach arg $argList {
+            if {[regexp {^--(\w+)=(.*)} $arg -> name value]
+                && $name eq $nameArg
+            } {
+                return $value
+            }
+        }
     }
 }

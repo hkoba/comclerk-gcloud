@@ -24,6 +24,9 @@ snit::type comclerk-gcloud {
     method accept args {
         set accepted [$ourKnownCmd accept {*}$args]
         puts $accepted
+        if {[dict exists $accepted name]} {
+            puts "# [dict get $accepted name] :: [dict get $accepted resource]"
+        }
     }
 
     method source fn {
@@ -35,13 +38,6 @@ snit::type comclerk-gcloud {
     typeconstructor {
         set ourKnownCmd [ComDict $type.comdict]
         
-        $ourKnownCmd translator add create [list apply {{matched global name args} {
-            dict merge \
-                $global \
-                [dict create name $name options $args] \
-                $matched
-        }}]
-
         $ourKnownCmd global-options add project
         # $ourKnownCmd global-options add region
         # $ourKnownCmd global-options add zone
@@ -81,8 +77,8 @@ snit::type comclerk-gcloud {
         # $ourKnownCmd 1arg-prefix add {dns record-sets transaction add}
         # $ourKnownCmd 1arg-prefix add {dns record-sets transaction execute}
         
-        $ourKnownCmd 1arg-prefix add {iap oauth-brand} \
-            create {alpha iap oauth-brands create}
+        $ourKnownCmd named-arg-prefix add {iap oauth-brand} \
+            create application_title {alpha iap oauth-brands create}
         $ourKnownCmd 1arg-prefix add {iap oauth-client} \
             create {alpha iap oauth-clients create}
         
