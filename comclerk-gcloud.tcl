@@ -7,24 +7,26 @@ package require snit
 source [file dirname [::fileutil::fullnormalize [info script]]]/lib/comdict.tcl
 
 snit::type comclerk-gcloud {
-    variable myCommandDict [dict create]
+    option -add-command ""
 
     component myInterp
     
     constructor args {
 
-        # $self configurelist $args
+        $self configurelist $args
         
         install myInterp using interp create $self.interp
 
         $myInterp alias gcloud \
-            $self accept        
+            $self accept
     }
     
     method accept args {
         set accepted [$ourKnownCmd accept {*}$args]
-        puts $accepted
-        if {[dict exists $accepted name]} {
+        if {$options(-add-command) ne ""} {
+            uplevel #0 [list {*}$options(-add-command) $accepted]
+        } elseif {[dict exists $accepted name]} {
+            puts $accepted
             puts "# [dict get $accepted name] :: [dict get $accepted resource]"
         }
     }
@@ -89,8 +91,25 @@ snit::type comclerk-gcloud {
     }
 }
 
+snit::widget comclerk-ui {
+    component myText
+
+    constructor args {
+        install myText using text $win.text
+        pack $myText -fill both -expand yes
+    }
+
+    method add accepted {
+        $myText insert end $accepted
+    }
+}
+
 if {![info level] && $::argv0 eq [info script]} {
-    set self [comclerk-gcloud clerk]
+    
+    pack [set self [comclerk-ui .win]] -fill both -expand yes
+    
+    set clerk [comclerk-gcloud clerk \
+                   -add-command [list $self add]]
     set argv [lassign $::argv fn]
-    $self source $fn
+    $clerk source $fn
 }
