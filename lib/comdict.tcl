@@ -24,6 +24,27 @@ snit::type ComDict {
         }
     }
 
+    method install script {
+        apply [list self $script] $self
+        set self
+    }
+
+    method define {prefixKind resource args} {
+        set item [$self $prefixKind configure \
+                      [dict create \
+                           kind $prefixKind \
+                           resource $resource] {*}$args]
+        if {$item eq ""} {
+            # configure で追加まで行なう
+        } else {
+            set prefix [dict get $item verbs [dict get $item trigger_verb]]
+            if {[dict exists $myPrefixDict $prefix]} {
+                error "Command definition confliction: gcloud $prefix"
+            }
+            dict set myPrefixDict $prefix $item
+        }
+    }
+
     method match-prefix argList {
         foreach prefix [dict keys $myPrefixDict] {
             if {[lrange $argList 0 [expr {[llength $prefix]-1}]] eq $prefix} {
@@ -54,19 +75,14 @@ snit::type ComDict {
         set removedOpts
     }
 
-    method {global-options add} option {
+    method define-global-option option {
         # XXX: 重複検査
         dict set myGlobalOptions $option [dict create]
     }
 
-    method {1arg-prefix add} {resource action prefix args} {
-        if {[dict exists $myPrefixDict $prefix]} {
-            error "Command definition confliction: gcloud $prefix"
-        }
-        dict set myPrefixDict $prefix \
+    method {1arg-prefix configure} {item action prefix args} {
+        dict merge $item \
             [dict create \
-                 kind 1arg-prefix \
-                 resource $resource \
                  trigger_verb $action \
                  verbs [dict create $action $prefix {*}$args]]
     }
@@ -77,11 +93,9 @@ snit::type ComDict {
         set name
     }
 
-    method {named-arg-prefix add} {resource action nameArg prefix args} {
-        dict set myPrefixDict $prefix \
+    method {named-arg-prefix configure} {item action nameArg prefix args} {
+        dict merge $item \
             [dict create \
-                 kind named-arg-prefix \
-                 resource $resource \
                  trigger_verb $action \
                  nameArg $nameArg \
                  verbs [dict create $action $prefix {*}$args]]
@@ -99,17 +113,16 @@ snit::type ComDict {
         }
     }
 
-    method {scope-prefix add} {resource begin beginPrefix end endPrefix} {
+    method {scope-prefix configure} {item begin beginPrefix end endPrefix} {
         foreach {kind prefix} [list begin $beginPrefix end $endPrefix] {
             if {[dict exists $myPrefixDict $prefix]} {
                 error "Command definition confliction: gcloud $prefix"
             }
             dict set myPrefixDict $prefix \
-                [dict create \
-                     kind scope-prefix \
-                     resource $resource \
-                     trigger_verb $kind \
-                     verbs [dict create $kind $prefix]]
+                [dict merge $item \
+                     [dict create \
+                          trigger_verb $kind \
+                          verbs [dict create $kind $prefix]]]
         }
     }
 
