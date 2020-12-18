@@ -19,9 +19,17 @@ snit::type ComDict {
         dict with matched {
             set name [$self $kind get-name rest $matched]
             dict create verb $trigger_verb resource $resource \
-                name $name options $rest \
+                name $name prefix $prefix options $rest \
                 {*}$globalOpts
         }
+    }
+
+    method stringify accepted {
+        append cmd "[dict get $accepted command] [dict get $accepted prefix] --[dict get $accepted project] \\\n"
+        if {[set opts [dict get $accepted options]] ne ""} {
+            append cmd "  [join $opts " \\\n  "]\n"
+        }
+        append cmd "\n"
     }
 
     method install script {

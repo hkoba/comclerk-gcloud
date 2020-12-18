@@ -27,12 +27,18 @@ snit::type comclerk {
     method accept {aliasCmdName args} {
         set comdict [dict get $myKnownCommandsDict $aliasCmdName]
         set accepted [$comdict accept {*}$args]
+        dict set accepted command $aliasCmdName
         if {$options(-add-command) ne ""} {
             uplevel #0 [list {*}$options(-add-command) $accepted]
         } elseif {[dict exists $accepted name]} {
             puts $accepted
             puts "# [dict get $accepted name] :: [dict get $accepted resource]"
         }
+    }
+
+    method stringify accepted {
+        set comdict [dict get $myKnownCommandsDict [dict get $accepted command]]
+        $comdict stringify $accepted
     }
 
     method source fn {
@@ -93,23 +99,29 @@ snit::type comclerk {
 snit::widget comclerk-ui {
     component myText
 
-    constructor args {
-        install myText using text $win.text \
-            -wrap none
-        pack $myText -fill both -expand yes
+    component myClerk
+
+   constructor args {
+       install myClerk using from args -clerk ""
+       install myText using text $win.text \
+           -wrap none
+       pack $myText -fill both -expand yes
     }
 
     method add accepted {
-        $myText insert end $accepted\n
+        $myText insert end [$myClerk stringify $accepted]\n
     }
 }
 
 if {![info level] && $::argv0 eq [info script]} {
 
-    pack [set self [comclerk-ui .win]] -fill both -expand yes
+    set win .win
+    set clerk clerk
 
-    set clerk [comclerk clerk \
-                   -add-command [list $self add]]
+    pack [comclerk-ui $win -clerk $clerk] -fill both -expand yes
+
+    comclerk $clerk \
+        -add-command [list $win add]
 
     $clerk install-comdict gcloud comdict-gcloud
 
