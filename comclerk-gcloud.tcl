@@ -28,7 +28,7 @@ snit::type comclerk {
     }
 
     method add {aliasCmdName args} {
-        lappend myCommandList [dict create original \
+        lappend myCommandList [dict create command \
                                    [list $aliasCmdName {*}$args]]
     }
 
@@ -37,20 +37,24 @@ snit::type comclerk {
     }
     
     method list {} {
-        $self parse $myCommandList
+        $self map-method parse-command {*}$myCommandList
     }
 
-    method parse {commandList} {
-        lmap cmdline $commandList {
-            set parsed [$self parse-command {*}[dict get $cmdline original]]
-            dict set cmdline parsed $parsed
-            # dict set cmdline known [expr {$parsed ne ""}]
+    method map-method {meth args} {
+        $self map [list $self $meth] {*}$args
+    }
+
+    method map {commandPrefix args} {
+        lmap cmdline $args {
+            {*}$commandPrefix $cmdline
         }
     }
 
-    method parse-command {cmd args} {
-        if {![dict exists $myKnownCommandsDict $cmd]} return
-        [dict get $myKnownCommandsDict $cmd] accept {*}$args
+    method parse-command cmdline {
+        set args [lassign [dict get $cmdline command] cmd]
+        dict set cmdline parsed [if {[dict exists $myKnownCommandsDict $cmd]} {
+            [dict get $myKnownCommandsDict $cmd] accept {*}$args
+        }]
     }
 
     method source fn {
