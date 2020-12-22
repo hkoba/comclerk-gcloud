@@ -12,7 +12,7 @@ snit::type ComDict {
         # puts [list gcloud {*}$args]
         set globalOpts [$self take-global-options args]
         if {[set prefix [$self match-prefix $args]] eq ""} {
-            return [list unknown $args]
+            return
         }
         set matched [dict get $myPrefixDict $prefix]
         set rest [lrange $args [llength $prefix] end]
@@ -25,7 +25,9 @@ snit::type ComDict {
     }
 
     method stringify accepted {
-        append cmd "[dict get $accepted command] [dict get $accepted prefix] --[dict get $accepted project] \\\n"
+        # XXX: name!
+        # XXX: named-arg-prefix, scope-prefix
+        append cmd "[dict get $accepted command] --[dict get $accepted project] [dict get $accepted prefix] \\\n"
         if {[set opts [dict get $accepted options]] ne ""} {
             append cmd "  [join $opts " \\\n  "]\n"
         }

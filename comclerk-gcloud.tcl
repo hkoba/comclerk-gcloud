@@ -7,38 +7,50 @@ package require snit
 source [file dirname [::fileutil::fullnormalize [info script]]]/lib/comdict.tcl
 
 snit::type comclerk {
-    option -add-command ""
-
     component myInterp
+
+    variable myCommandList [list]
 
     variable myKnownCommandsDict [dict create]
 
     constructor args {
-        $self configurelist $args
+        # $self configurelist $args
         install myInterp using interp create $self.interp
     }
 
-    method install-comdict {aliasCmdName comdict} {
-        dict set myKnownCommandsDict $aliasCmdName $comdict
+    method install-comdict {aliasCmdName {comdict ""}} {
         $myInterp alias $aliasCmdName \
-            $self accept $aliasCmdName
-    }
-
-    method accept {aliasCmdName args} {
-        set comdict [dict get $myKnownCommandsDict $aliasCmdName]
-        set accepted [$comdict accept {*}$args]
-        dict set accepted command $aliasCmdName
-        if {$options(-add-command) ne ""} {
-            uplevel #0 [list {*}$options(-add-command) $accepted]
-        } elseif {[dict exists $accepted name]} {
-            puts $accepted
-            puts "# [dict get $accepted name] :: [dict get $accepted resource]"
+            $self add $aliasCmdName
+        
+        if {$comdict ne ""} {
+            dict set myKnownCommandsDict $aliasCmdName $comdict
         }
     }
 
-    method stringify accepted {
-        set comdict [dict get $myKnownCommandsDict [dict get $accepted command]]
-        $comdict stringify $accepted
+    method add {aliasCmdName args} {
+        lappend myCommandList [dict create original \
+                                   [list $aliasCmdName {*}$args]]
+    }
+
+    method list-raw {} {
+        set myCommandList
+    }
+    
+    method list {} {
+        $self parse $myCommandList
+    }
+
+    method parse {commandList} {
+        lmap cmdline $commandList {
+            set parsed [$self parse-command {*}[dict get $cmdline original]]
+            dict set cmdline parsed $parsed
+            # dict set cmdline known [expr {$parsed ne ""}]
+        }
+    }
+
+    method parse-command {cmd args} {
+        if {![dict exists $myKnownCommandsDict $cmd]} return
+        [dict get $myKnownCommandsDict $cmd] accept {*}$args
     }
 
     method source fn {
@@ -101,7 +113,7 @@ snit::widget comclerk-ui {
 
     component myClerk
 
-   constructor args {
+    constructor args {
        install myClerk using from args -clerk ""
        install myText using text $win.text \
            -wrap none
@@ -109,22 +121,24 @@ snit::widget comclerk-ui {
     }
 
     method add accepted {
-        $myText insert end [$myClerk stringify $accepted]\n
+        $myText insert end [$myClerk stringify $accepted]
     }
 }
 
 if {![info level] && $::argv0 eq [info script]} {
 
-    set win .win
+    set argv [lassign $::argv fn]
+
     set clerk clerk
 
-    pack [comclerk-ui $win -clerk $clerk] -fill both -expand yes
-
-    comclerk $clerk \
-        -add-command [list $win add]
+    comclerk $clerk
 
     $clerk install-comdict gcloud comdict-gcloud
 
-    set argv [lassign $::argv fn]
     $clerk source $fn
+    
+    foreach line [$clerk list] {
+        puts $line
+    }
+    
 }
