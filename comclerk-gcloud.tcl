@@ -56,19 +56,23 @@ snit::type comclerk {
     }
 
     method parse-command cmdline {
-        set command [dict get $cmdline command]
-        set cmd [lindex $command 0]
-        dict set cmdline parsed [if {[dict exists $myKnownCommandsDict $cmd]} {
-            [dict get $myKnownCommandsDict $cmd] accept {*}$command
+        dict set cmdline parsed [$self dispatch-comdict cmd $cmdline {
+            $cmd accept {*}[dict get $cmdline command]
         }]
     }
 
     method stringify-command cmdline {
-        set command [dict get $cmdline command]
-        set cmd [lindex $command 0]
-        if {[dict exists $myKnownCommandsDict $cmd]} {
-            [dict get $myKnownCommandsDict $cmd] stringify \
-                [dict get $cmdline parsed]
+        $self dispatch-comdict cmd $cmdline {
+            $cmd stringify [dict get $cmdline parsed]
+        }
+    }
+
+    method dispatch-comdict {cmdVar cmdline script} {
+        upvar 1 $cmdVar cmd
+        lassign [dict get $cmdline command] cmdName
+        if {[dict exists $myKnownCommandsDict $cmdName]} {
+            set cmd [dict get $myKnownCommandsDict $cmdName]
+            uplevel 1 $script
         }
     }
 

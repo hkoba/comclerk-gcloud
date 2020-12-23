@@ -20,7 +20,7 @@ snit::type ComDict {
             set customOpts \
                 [lassign [$self $kind take-name-arg rest $matched] name]
             
-            # ↓戻り値になるので勘違いしないように。
+            # dict with の戻り値はこれ↓なので勘違いしないように
             dict create \
                 command $command \
                 verb $trigger_verb resource $resource \
