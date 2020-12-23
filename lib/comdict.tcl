@@ -19,6 +19,8 @@ snit::type ComDict {
         dict with matched {
             set customOpts \
                 [lassign [$self $kind take-name-arg rest $matched] name]
+            
+            # ↓戻り値になるので勘違いしないように。
             dict create \
                 command $command \
                 verb $trigger_verb resource $resource \
