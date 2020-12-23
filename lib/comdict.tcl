@@ -8,7 +8,7 @@ snit::type ComDict {
     
     variable myPrefixDict [dict create]
     
-    method accept args {
+    method accept {command args} {
         # puts [list gcloud {*}$args]
         set globalOpts [$self take-global-options args]
         if {[set prefix [$self match-prefix $args]] eq ""} {
@@ -17,17 +17,20 @@ snit::type ComDict {
         set matched [dict get $myPrefixDict $prefix]
         set rest [lrange $args [llength $prefix] end]
         dict with matched {
-            set name [$self $kind get-name rest $matched]
-            dict create verb $trigger_verb resource $resource \
+            set customOpts \
+                [lassign [$self $kind take-name-arg rest $matched] name]
+            dict create \
+                command $command \
+                verb $trigger_verb resource $resource \
+                kind $kind \
                 name $name prefix $prefix options $rest \
+                {*}$customOpts \
                 {*}$globalOpts
         }
     }
 
     method stringify accepted {
-        # XXX: name!
-        # XXX: named-arg-prefix, scope-prefix
-        append cmd "[dict get $accepted command] --[dict get $accepted project] [dict get $accepted prefix] \\\n"
+        append cmd "[dict get $accepted command] --[dict get $accepted project] [dict get $accepted prefix] [$self dispatch $accepted name-arg] \\\n"
         if {[set opts [dict get $accepted options]] ne ""} {
             append cmd "  [join $opts " \\\n  "]\n"
         }
@@ -40,7 +43,7 @@ snit::type ComDict {
     }
 
     method define {prefixKind resource args} {
-        set item [$self $prefixKind configure \
+        set item [$self $prefixKind define \
                       [dict create \
                            kind $prefixKind \
                            resource $resource] {*}$args]
@@ -53,6 +56,11 @@ snit::type ComDict {
             }
             dict set myPrefixDict $prefix $item
         }
+    }
+
+    method dispatch {specDict meth args} {
+        set kind [dict get $specDict kind]
+        $self $kind $meth $specDict {*}$args
     }
 
     method match-prefix argList {
@@ -90,20 +98,24 @@ snit::type ComDict {
         dict set myGlobalOptions $option [dict create]
     }
 
-    method {1arg-prefix configure} {item action prefix args} {
+    method {1arg-prefix define} {item action prefix args} {
         dict merge $item \
             [dict create \
                  trigger_verb $action \
                  verbs [dict create $action $prefix {*}$args]]
     }
 
-    method {1arg-prefix get-name} {argListVar specDict} {
+    method {1arg-prefix take-name-arg} {argListVar specDict} {
         upvar 1 $argListVar argList
         set argList [lassign $argList name]
-        set name
+        list $name
     }
 
-    method {named-arg-prefix configure} {item action nameArg prefix args} {
+    method {1arg-prefix name-arg} {specDict} {
+        dict get $specDict name
+    }
+
+    method {named-arg-prefix define} {item action nameArg prefix args} {
         dict merge $item \
             [dict create \
                  trigger_verb $action \
@@ -111,19 +123,37 @@ snit::type ComDict {
                  verbs [dict create $action $prefix {*}$args]]
     }
     
-    method {named-arg-prefix get-name} {argListVar specDict} {
+    method {named-arg-prefix take-name-arg} {argListVar specDict} {
         upvar 1 $argListVar argList
         set nameArg [dict get $specDict nameArg]
-        foreach arg $argList {
-            if {[regexp {^--(\w+)=(.*)} $arg -> name value]
-                && $name eq $nameArg
-            } {
-                return $value
-            }
+        if {[set pos [$self lsearch-option $argList $nameArg value]] >= 0} {
+            set argList [lreplace $argList $pos $pos]
+            return [list $value nameArg $nameArg]
         }
     }
+    
+    method {named-arg-prefix name-arg} {specDict} {
+        set nameArg [dict get $specDict nameArg]
+        set name [dict get $specDict name]
+        return --$nameArg=$name
+    }
 
-    method {scope-prefix configure} {item begin beginPrefix end endPrefix} {
+    method lsearch-option {argList name {valueVar ""}} {
+        if {$valueVar ne ""} {
+            upvar 1 $valueVar value
+        }
+        for {set i 0} {$i < [llength $argList]} {incr i} {
+            set arg [lindex $argList $i]
+            if {[regexp {^--(\w+)(?:=(.*))?} $arg -> nm val]
+                && $nm eq $name} {
+                set value $val
+                return $i
+            }
+        }
+        return -1
+    }
+
+    method {scope-prefix define} {item begin beginPrefix end endPrefix} {
         foreach {kind prefix} [list begin $beginPrefix end $endPrefix] {
             if {[dict exists $myPrefixDict $prefix]} {
                 error "Command definition confliction: gcloud $prefix"
@@ -136,7 +166,6 @@ snit::type ComDict {
         }
     }
 
-    method {scope-prefix get-name} {argListVar specDict} {
-        ;# nop
-    }
+    method {scope-prefix take-name-arg} {argListVar specDict} {}
+    method {scope-prefix name-arg} {specDict} {}
 }

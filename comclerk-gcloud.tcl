@@ -9,9 +9,11 @@ source [file dirname [::fileutil::fullnormalize [info script]]]/lib/comdict.tcl
 snit::type comclerk {
     component myInterp
 
-    variable myCommandList [list]
+    variable myCommandDict [dict create]
 
     variable myKnownCommandsDict [dict create]
+
+    variable myLastCommandId
 
     constructor args {
         # $self configurelist $args
@@ -28,16 +30,19 @@ snit::type comclerk {
     }
 
     method add {aliasCmdName args} {
-        lappend myCommandList [dict create command \
-                                   [list $aliasCmdName {*}$args]]
+        set cid [incr myLastCommandId]
+        dict set myCommandDict $cid \
+            [dict create \
+                 cid $cid \
+                 command [list $aliasCmdName {*}$args]]
     }
 
     method list-raw {} {
-        set myCommandList
+        set myCommandDict
     }
     
     method list {} {
-        $self map-method parse-command {*}$myCommandList
+        $self map-method parse-command {*}[dict values $myCommandDict]
     }
 
     method map-method {meth args} {
@@ -51,10 +56,20 @@ snit::type comclerk {
     }
 
     method parse-command cmdline {
-        set args [lassign [dict get $cmdline command] cmd]
+        set args [lassign [dict get $cmdline command] command]
+        set cmd [lindex $command 0]
         dict set cmdline parsed [if {[dict exists $myKnownCommandsDict $cmd]} {
-            [dict get $myKnownCommandsDict $cmd] accept {*}$args
+            [dict get $myKnownCommandsDict $cmd] accept $cmd {*}$args
         }]
+    }
+
+    method stringify-command cmdline {
+        set args [lassign [dict get $cmdline command] command]
+        set cmd [lindex $command 0]
+        if {[dict exists $myKnownCommandsDict $cmd]} {
+            [dict get $myKnownCommandsDict $cmd] stringify \
+                [dict get $cmdline parsed]
+        }
     }
 
     method source fn {
@@ -141,8 +156,11 @@ if {![info level] && $::argv0 eq [info script]} {
 
     $clerk source $fn
     
-    foreach line [$clerk list] {
+    # foreach line [$clerk list] {
+    #     puts $line
+    # }
+    
+    foreach line [$clerk map-method stringify-command {*}[$clerk list]] {
         puts $line
     }
-    
 }
