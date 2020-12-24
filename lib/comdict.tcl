@@ -8,6 +8,8 @@ snit::type ComDict {
     
     variable myPrefixDict [dict create]
     
+    variable myVerbCompleter ""
+
     method accept {command args} {
         # puts [list gcloud {*}$args]
         set globalOpts [$self take-global-options args]
@@ -39,6 +41,18 @@ snit::type ComDict {
         append cmd "\n"
     }
 
+    method stringify-verb {verb parsed} {
+        set matched [dict get $myPrefixDict [dict get $parsed prefix]]
+        dict with matched {
+            if {[dict exists $verbs $verb]} {
+                set cmd "[dict get $parsed command] --[dict get $parsed project]"
+                append cmd " [dict get $verbs $verb] [$self dispatch $parsed name-arg]\n"
+            } else {
+                return "# $verb not found in $verbs of $prefix"
+            }
+        }
+    }
+
     method install script {
         apply [list self $script] $self
         set self
@@ -58,6 +72,16 @@ snit::type ComDict {
             }
             dict set myPrefixDict $prefix $item
         }
+    }
+
+    method {verbs set-completer} {varName command} {
+        set myVerbCompleter [list apply [list [list self $varName] $command] \
+                                 $self]
+    }
+
+    method {verbs complete} args {
+        set verbsDict [dict create {*}$args]
+        {*}$myVerbCompleter $verbsDict
     }
 
     method dispatch {specDict meth args} {
@@ -104,7 +128,9 @@ snit::type ComDict {
         dict merge $item \
             [dict create \
                  trigger_verb $action \
-                 verbs [dict create $action $prefix {*}$args]]
+                 verbs [dict create $action $prefix \
+                            {*}[$self verbs complete \
+                                    $action $prefix {*}$args]]]
     }
 
     method {1arg-prefix take-name-arg} {argListVar specDict} {
@@ -122,7 +148,9 @@ snit::type ComDict {
             [dict create \
                  trigger_verb $action \
                  nameArg $nameArg \
-                 verbs [dict create $action $prefix {*}$args]]
+                 verbs [dict create $action $prefix \
+                            {*}[$self verbs complete \
+                                    $action $prefix {*}$args]]]
     }
     
     method {named-arg-prefix take-name-arg} {argListVar specDict} {

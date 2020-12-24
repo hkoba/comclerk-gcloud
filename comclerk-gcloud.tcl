@@ -12,6 +12,10 @@ snit::type comclerk {
     variable myCommandDict [dict create]
 
     variable myKnownCommandsDict [dict create]
+    
+    # To allow arbitrary order editing.
+    # (Note: original insertion order is kept in the dict itself)
+    variable myCommandOrder [list]
 
     variable myLastCommandId
 
@@ -30,7 +34,7 @@ snit::type comclerk {
     }
 
     method add {aliasCmdName args} {
-        set cid [incr myLastCommandId]
+        lappend myCommandOrder [set cid [incr myLastCommandId]]
         dict set myCommandDict $cid \
             [dict create \
                  cid $cid \
@@ -41,8 +45,14 @@ snit::type comclerk {
         set myCommandDict
     }
     
-    method list {} {
+    method list-parsed {} {
         $self map-method parse-command {*}[dict values $myCommandDict]
+    }
+
+    method list {} {
+        lmap cid $myCommandOrder {
+            dict get $myCommandDict $cid
+        }
     }
 
     method map-method {meth args} {
@@ -84,36 +94,73 @@ snit::type comclerk {
 [ComDict comdict-gcloud] install {
     $self define-global-option project
 
+    $self verbs set-completer verbsDict {
+        set known [dict create]
+        set missing [dict create]
+        dict for {verb prefix} $verbsDict {
+            if {$prefix eq "-"} {
+                dict set missing $verb $prefix
+            } else {
+                dict set known $verb $prefix
+            }
+        }
+        if {[dict exists $known create]
+            && [lindex [dict get $known create] end] eq "create"} {
+            # create が与えられて、他の動詞を補えば良いケース
+            foreach verb [dict keys $missing] {
+                dict set verbsDict $verb \
+                    [lreplace [dict get $known create] end end $verb]
+            }
+        } else {
+            
+        }
+        set verbsDict
+    }
+
     $self define 1arg-prefix vm \
-        create {beta compute instances create}
+        create {beta compute instances create} \
+        delete -
 
     $self define 1arg-prefix ig/unmanaged \
-        create {compute instance-groups unmanaged create}
+        create {compute instance-groups unmanaged create} \
+        delete -        
+
     $self define 1arg-prefix {ig named-port} \
         {set named-port} {compute instance-groups set-named-ports}
+
     $self define 1arg-prefix {ig vm} \
         {add vm} {compute instance-groups unmanaged add-instances}
 
     $self define 1arg-prefix address \
-        create {compute addresses create}
+        create {compute addresses create} \
+        delete -        
+
     $self define 1arg-prefix health-check \
-        create {compute health-checks create tcp}
+        create {compute health-checks create tcp} \
+        delete {compute health-checks delete}
 
     $self define 1arg-prefix {lb backend-service} \
-        create {compute backend-services create}
+        create {compute backend-services create} \
+        delete -
+
     $self define 1arg-prefix {lb backend-service backend} \
         {add ig} {compute backend-services add-backend}
 
     $self define 1arg-prefix {lb url-map} \
-        create {compute url-maps create}
+        create {compute url-maps create} \
+        delete -
 
     $self define 1arg-prefix ssl-certificate \
-        create {compute ssl-certificates create}
+        create {compute ssl-certificates create} \
+        delete -
+        
     $self define 1arg-prefix {lb target-https-proxie} \
-        create {compute target-https-proxies create}
+        create {compute target-https-proxies create} \
+        delete -
 
     $self define 1arg-prefix firewall-rule \
-        create {compute firewall-rules create}
+        create {compute firewall-rules create} \
+        delete -
 
     $self define scope-prefix {dns record-set} \
         begin {dns record-sets transaction start} \
@@ -122,9 +169,12 @@ snit::type comclerk {
         add {dns record-sets transaction add}
 
     $self define named-arg-prefix {iap oauth-brand} \
-        create application_title {alpha iap oauth-brands create}
+        create application_title {alpha iap oauth-brands create} \
+        delete -
+
     $self define 1arg-prefix {iap oauth-client} \
-        create {alpha iap oauth-clients create}
+        create {alpha iap oauth-clients create} \
+        delete -
 
     $self define 1arg-prefix {backend-service *} \
         update {compute backend-services update}
@@ -160,11 +210,18 @@ if {![info level] && $::argv0 eq [info script]} {
 
     $clerk source $fn
     
-    # foreach line [$clerk list] {
+    # foreach line [$clerk map-method stringify-command {*}[$clerk list-parsed]] {
     #     puts $line
     # }
-    
-    foreach line [$clerk map-method stringify-command {*}[$clerk list]] {
-        puts $line
+
+    foreach cmdline [$clerk list-parsed] {
+        $clerk dispatch-comdict cmd $cmdline {
+            set parsed [dict get $cmdline parsed]
+            if {[dict get $parsed verb] eq "create"} {
+                puts [$cmd stringify-verb delete $parsed]
+            } else {
+                # puts "parsed: $parsed"
+            }
+        }
     }
 }
